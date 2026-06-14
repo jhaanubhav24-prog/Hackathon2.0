@@ -1,9 +1,9 @@
 console.log("Hello Bhaiya");
 
 a = parseInt("134")
-let b = prompt("Hello")
-console.log(b)
-if(a > 18)
+let b = parseInt(prompt("Enter a number"))
+// console.log(b)
+if(b > 18)
 {
     console.log("Aap party kar sakte ho ");
 }

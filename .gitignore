@@ -1,33 +1,13 @@
-# Images - GitHub pe nahi jaayengi
+# Images / Photo files
 *.png
 *.jpg
 *.jpeg
 *.gif
-*.bmp
 *.svg
 *.ico
 *.webp
 
-# Python cache
+# Python cache (optional, but good practice)
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.Python
-
-# Virtual environment
-venv/
-env/
-.venv/
-
-# Temp / debug files
-debug_*.py
-test_*.js
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
+*$py.class

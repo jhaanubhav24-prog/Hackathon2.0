@@ -134,9 +134,18 @@ class Lexer:
         self.advance()  # skip opening quote
         result = []
         while self.pos < self.length and self.peek_char() != quote:
+            ch = self.peek_char()
+            if ch == "\n" or ch == "\r":
+                raise SyntaxError(f"Lexer error at line {start_line}: Unterminated string")
+            
             ch = self.advance()
             if ch == "\\":
                 nxt = self.advance()
+                if nxt in ("\n", "\r"):
+                    # Escaped newline (line continuation in JS)
+                    if nxt == "\r" and self.peek_char() == "\n":
+                        self.advance()
+                    continue
                 escapes = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\",
                            "'": "'", '"': '"', "`": "`"}
                 result.append(escapes.get(nxt, nxt))
