@@ -11,11 +11,12 @@ asaan ho jaata hai bina baar baar naya class likhe.
 
 
 class Node:
-    def __init__(self, type_, **kwargs):
+    def __init__(self, type_, line=0, **kwargs):
         self.type = type_
+        self.line = line          # source line number (set by Parser)
         for k, v in kwargs.items():
             setattr(self, k, v)
 
     def __repr__(self):
-        attrs = {k: v for k, v in self.__dict__.items() if k != "type"}
+        attrs = {k: v for k, v in self.__dict__.items() if k not in ("type", "line")}
         return f"{self.type}({attrs})"

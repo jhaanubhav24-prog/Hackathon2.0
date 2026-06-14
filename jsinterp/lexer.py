@@ -130,6 +130,7 @@ class Lexer:
         return Token("NUMBER", value, self.line)
 
     def _read_string(self, quote):
+        start_line = self.line   # string shuru hone ki line yaad rakho
         self.advance()  # skip opening quote
         result = []
         while self.pos < self.length and self.peek_char() != quote:
@@ -142,9 +143,9 @@ class Lexer:
             else:
                 result.append(ch)
         if self.pos >= self.length:
-            self.error("Unterminated string")
+            raise SyntaxError(f"Lexer error at line {start_line}: Unterminated string")
         self.advance()  # skip closing quote
-        return Token("STRING", "".join(result), self.line)
+        return Token("STRING", "".join(result), start_line)
 
     def _read_template_string(self):
         """
@@ -153,6 +154,7 @@ class Lexer:
         The parser will later parse each ${...} part as an expression.
         Result token value = list of ("str", text) or ("expr", source_code)
         """
+        start_line = self.line   # template shuru hone ki line
         self.advance()  # skip backtick
         parts = []
         buf = []
@@ -188,9 +190,9 @@ class Lexer:
         if buf:
             parts.append(("str", "".join(buf)))
         if self.pos >= self.length:
-            self.error("Unterminated template string")
+            raise SyntaxError(f"Lexer error at line {start_line}: Unterminated template string")
         self.advance()  # skip closing backtick
-        return Token("TEMPLATE", parts, self.line)
+        return Token("TEMPLATE", parts, start_line)
 
     def _read_identifier(self):
         start = self.pos

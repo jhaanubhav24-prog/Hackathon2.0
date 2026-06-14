@@ -30,7 +30,7 @@ def main():
             with open(path, "r", encoding="utf-8") as f:
                 source = f.read()
         except FileNotFoundError:
-            print(f"❌ File nahi mili bhai: '{path}' 😅")
+            print(f"[ERROR] File nahi mili bhai: '{path}'")
             sys.exit(1)
 
     # Case 3: echo "..." | python3 main.py  <- stdin se
@@ -38,6 +38,10 @@ def main():
         source = sys.stdin.read()
 
     # ---- run karo ----
+    # stdout ko utf-8 mode mein set karo (Windows ke liye)
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
     interpreter = Interpreter()
     try:
         output = interpreter.run(source)
@@ -50,9 +54,9 @@ def main():
         # line number nikalo agar ho
         line = _extract_line(msg)
         if line:
-            print(f"❌ Line {line} pe kuch gadbad hai bhai 😅 → {_clean(msg)}")
+            print(f"[ERROR] Line {line} pe kuch gadbad hai bhai --> {_clean(msg)}")
         else:
-            print(f"❌ Error aaya bhai 😅 → {_clean(msg)}")
+            print(f"[ERROR] Error aaya bhai --> {_clean(msg)}")
         sys.exit(1)
 
     except SyntaxError as e:
@@ -60,13 +64,13 @@ def main():
         msg = str(e)
         line = _extract_line(msg)
         if line:
-            print(f"❌ Line {line} pe syntax galat hai bhai 😅 → {_clean(msg)}")
+            print(f"[ERROR] Line {line} pe syntax galat hai bhai --> {_clean(msg)}")
         else:
-            print(f"❌ Syntax galat hai bhai 😅 → {_clean(msg)}")
+            print(f"[ERROR] Syntax galat hai bhai --> {_clean(msg)}")
         sys.exit(1)
 
     except Exception as e:
-        print(f"❌ Kuch to gadbad hai bhai 😅 → {str(e)}")
+        print(f"[ERROR] Kuch to gadbad hai bhai --> {str(e)}")
         sys.exit(1)
 
 
@@ -81,11 +85,14 @@ def _extract_line(msg):
 
 def _clean(msg):
     """Error message ko chhota aur readable banata hai."""
-    # sirf pehla meaningful part lo
     msg = str(msg)
+    import re
+    # "Lexer error at line X: Unterminated string" -> "Unterminated string"
+    m_lexer = re.match(r"Lexer error at line \d+:\s*(.+)", msg)
+    if m_lexer:
+        return m_lexer.group(1).strip()
     # "Unexpected token in expression: Token(OP, ';') at line 3"
     # -> "Unexpected token ';'"
-    import re
     m = re.search(r"Token\(\w+,\s*'?([^'\")\s]+)'?\)", msg)
     if m:
         token = m.group(1)

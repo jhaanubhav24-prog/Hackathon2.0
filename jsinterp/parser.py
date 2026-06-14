@@ -40,6 +40,10 @@ class Parser:
     def current(self):
         return self.tokens[self.pos]
 
+    def current_line(self):
+        """Current token ki source line number return karta hai."""
+        return self.tokens[self.pos].line
+
     def advance(self):
         tok = self.tokens[self.pos]
         self.pos += 1
@@ -82,10 +86,11 @@ class Parser:
         statements = []
         while self.current().type != "EOF":
             statements.append(self.parse_statement())
-        return Node("Program", body=statements)
+        return Node("Program", line=1, body=statements)
 
     def parse_statement(self):
         tok = self.current()
+        line = tok.line
 
         if tok.type == "KEYWORD":
             if tok.value in ("let", "const", "var"):
@@ -109,15 +114,15 @@ class Parser:
                 else:
                     val = self.parse_expression()
                 self.skip_semi()
-                return Node("Return", value=val)
+                return Node("Return", line=line, value=val)
             if tok.value == "break":
                 self.advance()
                 self.skip_semi()
-                return Node("Break")
+                return Node("Break", line=line)
             if tok.value == "continue":
                 self.advance()
                 self.skip_semi()
-                return Node("Continue")
+                return Node("Continue", line=line)
             if tok.value == "switch":
                 return self.parse_switch()
 
@@ -126,22 +131,24 @@ class Parser:
 
         if self.check_op(";"):
             self.advance()
-            return Node("Empty")
+            return Node("Empty", line=line)
 
         # Expression statement
         expr = self.parse_expression()
         self.skip_semi()
-        return Node("ExpressionStatement", expr=expr)
+        return Node("ExpressionStatement", line=line, expr=expr)
 
     def parse_block(self):
+        line = self.current_line()
         self.expect_op("{")
         body = []
         while not self.check_op("}"):
             body.append(self.parse_statement())
         self.expect_op("}")
-        return Node("Block", body=body)
+        return Node("Block", line=line, body=body)
 
     def parse_var_decl(self):
+        line = self.current_line()
         kind = self.advance().value  # let/const/var
         declarations = []
         while True:
@@ -155,14 +162,15 @@ class Parser:
                 self.advance()
                 continue
             break
-        return Node("VarDecl", kind=kind, declarations=declarations)
+        return Node("VarDecl", line=line, kind=kind, declarations=declarations)
 
     def parse_function_decl(self):
+        line = self.current_line()
         self.expect_kw("function")
         name = self.expect_ident().value
         params = self.parse_params()
         body = self.parse_block()
-        return Node("FunctionDecl", name=name, params=params, body=body)
+        return Node("FunctionDecl", line=line, name=name, params=params, body=body)
 
     def parse_params(self):
         self.expect_op("(")
@@ -185,6 +193,7 @@ class Parser:
         return params
 
     def parse_if(self):
+        line = self.current_line()
         self.expect_kw("if")
         self.expect_op("(")
         cond = self.parse_expression()
@@ -194,9 +203,10 @@ class Parser:
         if self.check_kw("else"):
             self.advance()
             else_branch = self.parse_statement()
-        return Node("If", cond=cond, then=then_branch, otherwise=else_branch)
+        return Node("If", line=line, cond=cond, then=then_branch, otherwise=else_branch)
 
     def parse_for(self):
+        line = self.current_line()
         self.expect_kw("for")
         self.expect_op("(")
 
@@ -216,7 +226,7 @@ class Parser:
                 iterable = self.parse_expression()
                 self.expect_op(")")
                 body = self.parse_statement()
-                return Node("ForOf" if kind == "of" else "ForIn", left=init, iterable=iterable, body=body)
+                return Node("ForOf" if kind == "of" else "ForIn", line=line, left=init, iterable=iterable, body=body)
 
             self.expect_op(";")
 
@@ -235,17 +245,19 @@ class Parser:
         self.expect_op(")")
 
         body = self.parse_statement()
-        return Node("For", init=init, cond=cond, update=update, body=body)
+        return Node("For", line=line, init=init, cond=cond, update=update, body=body)
 
     def parse_while(self):
+        line = self.current_line()
         self.expect_kw("while")
         self.expect_op("(")
         cond = self.parse_expression()
         self.expect_op(")")
         body = self.parse_statement()
-        return Node("While", cond=cond, body=body)
+        return Node("While", line=line, cond=cond, body=body)
 
     def parse_do_while(self):
+        line = self.current_line()
         self.expect_kw("do")
         body = self.parse_statement()
         self.expect_kw("while")
@@ -253,9 +265,10 @@ class Parser:
         cond = self.parse_expression()
         self.expect_op(")")
         self.skip_semi()
-        return Node("DoWhile", cond=cond, body=body)
+        return Node("DoWhile", line=line, cond=cond, body=body)
 
     def parse_switch(self):
+        line = self.current_line()
         self.expect_kw("switch")
         self.expect_op("(")
         disc = self.parse_expression()
@@ -279,9 +292,9 @@ class Parser:
                     body.append(self.parse_statement())
                 cases.append({"test": None, "body": body})
             else:
-                raise SyntaxError(f"Unexpected token in switch: {self.current()}")
+                raise SyntaxError(f"Unexpected token in switch: {self.current()} at line {self.current_line()}")
         self.expect_op("}")
-        return Node("Switch", discriminant=disc, cases=cases)
+        return Node("Switch", line=line, discriminant=disc, cases=cases)
 
     # ---------- expressions (operator precedence) ----------
 
@@ -297,58 +310,65 @@ class Parser:
     ASSIGN_OPS = {"=", "+=", "-=", "*=", "/=", "%=", "**="}
 
     def parse_assignment(self):
+        line = self.current_line()
         left = self.parse_ternary()
         if self.current().type == "OP" and self.current().value in self.ASSIGN_OPS:
             op = self.advance().value
             right = self.parse_assignment()
-            return Node("Assign", op=op, target=left, value=right)
+            return Node("Assign", line=line, op=op, target=left, value=right)
         return left
 
     def parse_ternary(self):
+        line = self.current_line()
         cond = self.parse_logical_or()
         if self.check_op("?"):
             self.advance()
             consequent = self.parse_assignment()
             self.expect_op(":")
             alternate = self.parse_assignment()
-            return Node("Conditional", test=cond, consequent=consequent, alternate=alternate)
+            return Node("Conditional", line=line, test=cond, consequent=consequent, alternate=alternate)
         return cond
 
     def parse_logical_or(self):
         left = self.parse_logical_and()
         while self.check_op("||") or self.check_op("??"):
+            line = self.current_line()
             op = self.advance().value
             right = self.parse_logical_and()
-            left = Node("Logical", op=op, left=left, right=right)
+            left = Node("Logical", line=line, op=op, left=left, right=right)
         return left
 
     def parse_logical_and(self):
         left = self.parse_equality()
         while self.check_op("&&"):
+            line = self.current_line()
             op = self.advance().value
             right = self.parse_equality()
-            left = Node("Logical", op=op, left=left, right=right)
+            left = Node("Logical", line=line, op=op, left=left, right=right)
         return left
 
     def parse_equality(self):
         left = self.parse_relational()
         while self.current().type == "OP" and self.current().value in ("==", "!=", "===", "!=="):
+            line = self.current_line()
             op = self.advance().value
             right = self.parse_relational()
-            left = Node("Binary", op=op, left=left, right=right)
+            left = Node("Binary", line=line, op=op, left=left, right=right)
         return left
 
     def parse_relational(self):
         left = self.parse_additive()
         while True:
             if self.current().type == "OP" and self.current().value in ("<", ">", "<=", ">="):
+                line = self.current_line()
                 op = self.advance().value
                 right = self.parse_additive()
-                left = Node("Binary", op=op, left=left, right=right)
+                left = Node("Binary", line=line, op=op, left=left, right=right)
             elif self.check_kw("instanceof"):
+                line = self.current_line()
                 self.advance()
                 right = self.parse_additive()
-                left = Node("Binary", op="instanceof", left=left, right=right)
+                left = Node("Binary", line=line, op="instanceof", left=left, right=right)
             else:
                 break
         return left
@@ -356,25 +376,28 @@ class Parser:
     def parse_additive(self):
         left = self.parse_multiplicative()
         while self.current().type == "OP" and self.current().value in ("+", "-"):
+            line = self.current_line()
             op = self.advance().value
             right = self.parse_multiplicative()
-            left = Node("Binary", op=op, left=left, right=right)
+            left = Node("Binary", line=line, op=op, left=left, right=right)
         return left
 
     def parse_multiplicative(self):
         left = self.parse_exponent()
         while self.current().type == "OP" and self.current().value in ("*", "/", "%"):
+            line = self.current_line()
             op = self.advance().value
             right = self.parse_exponent()
-            left = Node("Binary", op=op, left=left, right=right)
+            left = Node("Binary", line=line, op=op, left=left, right=right)
         return left
 
     def parse_exponent(self):
         left = self.parse_unary()
         if self.check_op("**"):
+            line = self.current_line()
             self.advance()
             right = self.parse_exponent()  # right-associative
-            return Node("Binary", op="**", left=left, right=right)
+            return Node("Binary", line=line, op="**", left=left, right=right)
         return left
 
     def parse_unary(self):
@@ -382,33 +405,34 @@ class Parser:
         if tok.type == "OP" and tok.value in ("!", "-", "+", "~"):
             self.advance()
             operand = self.parse_unary()
-            return Node("Unary", op=tok.value, operand=operand)
+            return Node("Unary", line=tok.line, op=tok.value, operand=operand)
         if tok.type == "OP" and tok.value in ("++", "--"):
             self.advance()
             operand = self.parse_unary()
-            return Node("UpdateExpression", op=tok.value, operand=operand, prefix=True)
+            return Node("UpdateExpression", line=tok.line, op=tok.value, operand=operand, prefix=True)
         if tok.type == "KEYWORD" and tok.value == "typeof":
             self.advance()
             operand = self.parse_unary()
-            return Node("Unary", op="typeof", operand=operand)
+            return Node("Unary", line=tok.line, op="typeof", operand=operand)
         if tok.type == "KEYWORD" and tok.value == "delete":
             self.advance()
             operand = self.parse_unary()
-            return Node("Unary", op="delete", operand=operand)
+            return Node("Unary", line=tok.line, op="delete", operand=operand)
         if tok.type == "KEYWORD" and tok.value == "new":
             self.advance()
             callee = self.parse_member_chain(self.parse_primary())
             args = []
             if self.check_op("("):
                 args = self.parse_arguments()
-            return Node("New", callee=callee, arguments=args)
+            return Node("New", line=tok.line, callee=callee, arguments=args)
         return self.parse_postfix()
 
     def parse_postfix(self):
         expr = self.parse_call_member()
         if self.current().type == "OP" and self.current().value in ("++", "--"):
+            line = self.current_line()
             op = self.advance().value
-            return Node("UpdateExpression", op=op, operand=expr, prefix=False)
+            return Node("UpdateExpression", line=line, op=op, operand=expr, prefix=False)
         return expr
 
     def parse_call_member(self):
@@ -418,17 +442,20 @@ class Parser:
     def parse_member_chain(self, expr):
         while True:
             if self.check_op("."):
+                line = self.current_line()
                 self.advance()
                 prop = self.advance().value  # IDENT or keyword used as prop name
-                expr = Node("Member", obj=expr, prop=Node("Literal", value=prop), computed=False)
+                expr = Node("Member", line=line, obj=expr, prop=Node("Literal", line=line, value=prop), computed=False)
             elif self.check_op("["):
+                line = self.current_line()
                 self.advance()
                 prop = self.parse_expression()
                 self.expect_op("]")
-                expr = Node("Member", obj=expr, prop=prop, computed=True)
+                expr = Node("Member", line=line, obj=expr, prop=prop, computed=True)
             elif self.check_op("("):
+                line = self.current_line()
                 args = self.parse_arguments()
-                expr = Node("Call", callee=expr, arguments=args)
+                expr = Node("Call", line=line, callee=expr, arguments=args)
             else:
                 break
         return expr
@@ -454,11 +481,11 @@ class Parser:
 
         if tok.type == "NUMBER":
             self.advance()
-            return Node("Literal", value=tok.value)
+            return Node("Literal", line=tok.line, value=tok.value)
 
         if tok.type == "STRING":
             self.advance()
-            return Node("Literal", value=tok.value)
+            return Node("Literal", line=tok.line, value=tok.value)
 
         if tok.type == "TEMPLATE":
             self.advance()
@@ -470,24 +497,24 @@ class Parser:
                     sub_tokens = Lexer(content).tokenize()
                     sub_ast = Parser(sub_tokens).parse_expression()
                     parts.append(("expr", sub_ast))
-            return Node("Template", parts=parts)
+            return Node("Template", line=tok.line, parts=parts)
 
         if tok.type == "KEYWORD":
             if tok.value == "true":
                 self.advance()
-                return Node("Literal", value=True)
+                return Node("Literal", line=tok.line, value=True)
             if tok.value == "false":
                 self.advance()
-                return Node("Literal", value=False)
+                return Node("Literal", line=tok.line, value=False)
             if tok.value == "null":
                 self.advance()
-                return Node("Literal", value=None)
+                return Node("Literal", line=tok.line, value=None)
             if tok.value == "undefined":
                 self.advance()
-                return Node("Identifier", name="undefined")
+                return Node("Identifier", line=tok.line, name="undefined")
             if tok.value == "this":
                 self.advance()
-                return Node("This")
+                return Node("This", line=tok.line)
             if tok.value == "function":
                 return self.parse_function_expr()
 
@@ -499,7 +526,7 @@ class Parser:
                 self.advance()  # =>
                 return self.finish_arrow_function([{"name": param_name, "default": None, "rest": False}])
             self.advance()
-            return Node("Identifier", name=tok.value)
+            return Node("Identifier", line=tok.line, name=tok.value)
 
         if self.check_op("("):
             # Could be: (expr) OR arrow function params (a, b) => ...
@@ -538,43 +565,48 @@ class Parser:
         return False
 
     def finish_arrow_function(self, params):
+        line = self.current_line()
         if self.check_op("{"):
             body = self.parse_block()
             is_expr_body = False
         else:
             body = self.parse_assignment()
             is_expr_body = True
-        return Node("ArrowFunction", params=params, body=body, expr_body=is_expr_body)
+        return Node("ArrowFunction", line=line, params=params, body=body, expr_body=is_expr_body)
 
     def parse_function_expr(self):
+        line = self.current_line()
         self.expect_kw("function")
         name = None
         if self.current().type == "IDENT":
             name = self.advance().value
         params = self.parse_params()
         body = self.parse_block()
-        return Node("FunctionExpr", name=name, params=params, body=body)
+        return Node("FunctionExpr", line=line, name=name, params=params, body=body)
 
     def parse_array_literal(self):
+        line = self.current_line()
         self.expect_op("[")
         elements = []
         while not self.check_op("]"):
             if self.check_op(","):
                 # elision (sparse array) - represent as undefined
-                elements.append(Node("Identifier", name="undefined"))
+                elements.append(Node("Identifier", line=self.current_line(), name="undefined"))
                 self.advance()
                 continue
             if self.check_op("..."):
+                el_line = self.current_line()
                 self.advance()
-                elements.append(Node("Spread", value=self.parse_assignment()))
+                elements.append(Node("Spread", line=el_line, value=self.parse_assignment()))
             else:
                 elements.append(self.parse_assignment())
             if self.check_op(","):
                 self.advance()
         self.expect_op("]")
-        return Node("ArrayLiteral", elements=elements)
+        return Node("ArrayLiteral", line=line, elements=elements)
 
     def parse_object_literal(self):
+        line = self.current_line()
         self.expect_op("{")
         properties = []
         while not self.check_op("}"):
@@ -606,13 +638,14 @@ class Parser:
             elif tok.type == "NUMBER":
                 key = str(self.advance().value)
             else:
-                raise SyntaxError(f"Unexpected token in object literal: {tok}")
+                raise SyntaxError(f"Unexpected token in object literal: {tok} at line {tok.line}")
 
             # method shorthand: key(...) { ... }
             if self.check_op("("):
+                mline = self.current_line()
                 params = self.parse_params()
                 body = self.parse_block()
-                value = Node("FunctionExpr", name=None, params=params, body=body)
+                value = Node("FunctionExpr", line=mline, name=None, params=params, body=body)
                 properties.append({"type": "normal", "key": key, "value": value})
             elif self.check_op(":"):
                 self.advance()
@@ -620,13 +653,13 @@ class Parser:
                 properties.append({"type": "normal", "key": key, "value": value})
             else:
                 # shorthand: { x } means { x: x }
-                value = Node("Identifier", name=key)
+                value = Node("Identifier", line=tok.line, name=key)
                 properties.append({"type": "normal", "key": key, "value": value})
 
             if self.check_op(","):
                 self.advance()
         self.expect_op("}")
-        return Node("ObjectLiteral", properties=properties)
+        return Node("ObjectLiteral", line=line, properties=properties)
 
 
 def parse(source):

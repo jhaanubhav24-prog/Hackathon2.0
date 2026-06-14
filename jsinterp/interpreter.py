@@ -575,7 +575,13 @@ class Interpreter:
         method = getattr(self, f"exec_{node.type}", None)
         if method is None:
             raise JSThrow(f"Unsupported statement type: {node.type}")
-        return method(node, env)
+        try:
+            return method(node, env)
+        except JSThrow as e:
+            msg = str(e.value)
+            if "line" not in msg.lower() and hasattr(node, "line") and node.line:
+                raise JSThrow(f"{msg} at line {node.line}")
+            raise
 
     def exec_Program(self, node, env):
         self.exec_block_statements(node.body, env)
@@ -738,7 +744,14 @@ class Interpreter:
         method = getattr(self, f"eval_{node.type}", None)
         if method is None:
             raise JSThrow(f"Unsupported expression type: {node.type}")
-        return method(node, env)
+        try:
+            return method(node, env)
+        except JSThrow as e:
+            # Agar error mein line number nahi hai, to node ki line add karo
+            msg = str(e.value)
+            if "line" not in msg.lower() and hasattr(node, "line") and node.line:
+                raise JSThrow(f"{msg} (at line {node.line})")
+            raise
 
     def eval_Literal(self, node, env):
         return node.value
@@ -746,7 +759,14 @@ class Interpreter:
     def eval_Identifier(self, node, env):
         if node.name == "undefined":
             return UNDEFINED
-        return env.get(node.name)
+        try:
+            return env.get(node.name)
+        except JSThrow as e:
+            msg = str(e.value)
+            line = getattr(node, "line", 0)
+            if line and "line" not in msg.lower():
+                raise JSThrow(f"{msg} at line {line}")
+            raise
 
     def eval_This(self, node, env):
         try:
