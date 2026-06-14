@@ -1,4 +1,4 @@
-console.log("Hello Coder Army Bhaiya");
+console.log("Hello  Bhaiya");
 
 a = parseInt("1")
 let b = prompt("Hello")
@@ -20,8 +20,7 @@ for(let i = 0;i<10;i++)
 let obj = 
 {
     name :" ANUBHAV JHA",
-    rollNo: 23,
-    address:"PATNA BIHAR"
+    rollNo: 21,
 }
 
 console.log(obj)

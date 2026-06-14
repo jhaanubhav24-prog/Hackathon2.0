@@ -6,9 +6,9 @@ pipeline se chalta hai.
 
 ## Kaise chalayein
 
-python main.py path/to/script.js
-python main.py -c "console.log(1+1)"
-echo "console.log('hi')" | python3 main.py
+python main.py path/to/script.js \n  
+python main.py -c "console.log(1+1)" \n
+echo "console.log('hi')" | python3 main.py \ n 
 
 ## Architecture
 
@@ -55,5 +55,5 @@ TC5 - String Palindrome      ✅
 
 ## Chalane ka tarika
 
-cd hackathon
-python3 main.py test.js
+cd hackathon2.0
+python main.py test.js
